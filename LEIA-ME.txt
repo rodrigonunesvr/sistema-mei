@@ -1,7 +1,11 @@
 SISTEMA MEI — arquivos do site
-- index.html            -> o aplicativo (todo o funcionamento)
-- manifest.webmanifest  -> permite instalar na tela inicial do celular
-- sw.js                 -> permite abrir sem internet
-- icon-192.png / icon-512.png -> ícone do aplicativo
+- index.html            -> o aplicativo
+- licenca-config.js     -> ativa/desativa a trava de licença e guarda a lista de códigos revogados
+                           (gere o seu na ferramenta gerador-de-licencas.html)
+- manifest.webmanifest  -> instalação na tela inicial
+- sw.js                 -> funcionamento sem internet
+- icon-192.png / icon-512.png -> ícone
 
-Para ATUALIZAR o app no futuro: troque o index.html e, no arquivo sw.js, aumente o número da versão (mei-v1 -> mei-v2).
+Para ATUALIZAR o app: troque o index.html e aumente a versão no sw.js (mei-v2 -> mei-v3).
+Para REVOGAR uma licença: marque no gerador, baixe o novo licenca-config.js, substitua aqui e publique.
+NUNCA coloque o gerador-de-licencas.html nem o cofre nesta pasta.

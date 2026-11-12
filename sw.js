@@ -1,6 +1,6 @@
-/* Guarda o app no aparelho para abrir offline. Troque o número da versão (V) quando atualizar o app. */
-const V = 'mei-v1';
-const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+/* Guarda o app no aparelho para abrir offline. Aumente o número da versão (V) sempre que atualizar o app. */
+const V = 'mei-v2';
+const FILES = ['./', 'index.html', 'licenca-config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });

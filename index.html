@@ -125,6 +125,10 @@ nav.bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--su
 .frm[data-rep="none"] .only-rep{display:none}
 .chip-row{display:flex;flex-wrap:wrap;gap:8px}
 .mini.tall{min-height:56px;text-align:left;line-height:1.3}
+.tbtn{margin-left:10px;min-height:36px;padding:0 12px;border-radius:8px;border:1px solid currentColor;background:transparent;color:inherit;font-weight:700;cursor:pointer}
+.toast{z-index:120}
+#gate{align-items:center;background:var(--bg);z-index:90}
+.lic-foot{text-align:center;color:var(--muted);font-size:12px;margin:22px 0 0}
 @media print{
   body *{visibility:hidden}
   #print-area,#print-area *{visibility:visible}
@@ -138,9 +142,11 @@ nav.bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--su
 <nav class="bottom" aria-label="Menu principal"><div class="navin" id="nav"></div></nav>
 <div class="ov" id="ov" hidden></div>
 <div class="ov" id="lock" hidden></div>
+<div class="ov" id="gate" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
 <noscript>Este aplicativo precisa de JavaScript para funcionar.</noscript>
 
+<script src="licenca-config.js"></script>
 <script>
 (function(){
 'use strict';
@@ -171,11 +177,11 @@ var byName=function(a,b){return a.nome.localeCompare(b.nome,'pt-BR')};
 var $=function(id){return document.getElementById(id)};
 
 /* ============================== estado ============================== */
-var S=null,memOnly=false;
+var S=null,memOnly=false,LIC=null,deferredInstall=null;
 function blank(){var t=new Date();return {v:1,demo:false,config:{nome:'Meu negócio MEI',ano:t.getFullYear(),limite:81000,das:86.05,meta:3000,alerta:80,cnpj:'',contato:'',pix:'',r13:10,rEm:10,rRe:10},clientes:[],servicos:[],lanc:[],orcs:[],lastBackup:0,pin:'',welcomed:false,obrig:{das:{},rel:{},dasn:false,check:{}},pre:{renda:3000,fixos:400,reserva:15,dias:20,horasDia:5,taxa:3,margem:30}}}
 function migrate(o){var b=blank();o.config=Object.assign(b.config,o.config||{});o.pre=Object.assign(b.pre,o.pre||{});o.orcs=o.orcs||[];o.lastBackup=o.lastBackup||0;o.pin=o.pin||'';if(o.welcomed===undefined)o.welcomed=true;o.obrig=o.obrig||b.obrig;return o}
 function load(){try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.v===1)return migrate(o)}}catch(e){memOnly=true}return null}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){memOnly=true}}
+function save(){if(LIC&&S)S.licId=LIC.id;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){memOnly=true}}
 
 function demo(){
   var t=new Date(),cm=t.getMonth()+1,td=t.getDate(),s=blank();
@@ -252,13 +258,14 @@ function extenso(v){v=Math.round((Number(v)||0)*100)/100;if(v<=0)return '';if(v>
 var UI={month:new Date().getMonth()+1,lm:new Date().getMonth()+1,tipo:'todos',st:'todos',busca:'',orcMode:'orc',orc:null,rec:null,armed:null,parados:false};
 function resetOrc(){UI.orc={num:'',cliente:'',itens:[{sid:'',qtd:'1'}],desc:'0',val:'7',cond:'',prazo:'',obs:''};UI.rec={cliente:'',doc:'',valor:'',desc:'',forma:'Pix',local:''}}
 resetOrc();
-function toast(t){var e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(function(){e.hidden=true},2600)}
+function toast(t,act){var e=$('toast');e.innerHTML=esc(t)+(act?' <button class="tbtn" data-a="undo">'+esc(act.label)+'</button>':'');UI.undo=act?act.fn:null;e.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(function(){e.hidden=true;UI.undo=null},act?7000:2600)}
 function openSheet(html){var o=$('ov');o.innerHTML='<div class="sheet" role="dialog" aria-modal="true" tabindex="-1">'+html+'</div>';o.hidden=false;var s=o.firstChild;if(s&&s.focus)s.focus()}
 function closeSheet(){var o=$('ov');o.hidden=true;o.innerHTML='';UI.armed=null}
 function route(){var h=(location.hash||'').slice(1);return ROUTES[h]?h:'painel'}
 function go(r){if(location.hash==='#'+r)render();else location.hash='#'+r}
 var help=function(t,p,steps){return '<details class="help"><summary><span class="q" aria-hidden="true">?</span>'+t+'</summary><div class="hb"><p>'+p+'</p>'+(steps?'<ol>'+steps.map(function(s){return '<li>'+s+'</li>'}).join('')+'</ol>':'')+'</div></details>'};
 var head=function(t,sub){return '<div class="top"><h1>'+t+'</h1>'+(sub?'<span class="muted">'+esc(sub)+'</span>':'')+'</div>'};
+var yearSel=function(){var ys={};ys[S.config.ano]=1;ys[new Date().getFullYear()]=1;S.lanc.forEach(function(l){ys[l.data.slice(0,4)]=1});var a=Object.keys(ys).map(Number).sort(function(x,y){return y-x});return '<select class="in" data-on="ano" aria-label="Ano">'+a.map(function(y){return '<option'+(y===S.config.ano?' selected':'')+'>'+y+'</option>'}).join('')+'</select>'};
 var monthSel=function(on,val,withAll){var o=withAll?'<option value="0"'+(val===0?' selected':'')+'>Ano todo</option>':'';for(var i=1;i<=12;i++)o+='<option value="'+i+'"'+(i===val?' selected':'')+'>'+MES[i-1]+' de '+S.config.ano+'</option>';return '<select class="in" data-on="'+on+'" aria-label="Mês">'+o+'</select>'};
 
 /* ============================== telas ============================== */
@@ -302,7 +309,7 @@ R.painel=function(){
   var br=buckets('receita'),bp=buckets('despesa');
   var h=head('Painel',c.nome)+help('O que é o Painel?','É a tela de resultados do seu negócio: mostra quanto você faturou, gastou e lucrou, quanto pode retirar, quanto falta para o limite anual do MEI e o que está atrasado. Você quase não digita nada aqui: tudo é calculado a partir dos seus lançamentos.',['Use a “Venda rápida” para registrar um serviço em um toque.','Escolha o mês e veja o lucro e a meta.','Confira a barra do limite do MEI e as contas atrasadas.']);
   h+=quickChips();
-  h+='<div class="card">'+monthSel('painelmes',m)+'</div>';
+  h+='<div class="card"><div class="row"><div class="grow">'+monthSel('painelmes',m)+'</div><div style="width:104px">'+yearSel()+'</div></div></div>';
   h+='<div class="kpis"><div class="kpi"><div class="l">Faturado no mês</div><div class="v pos">'+brl(fat)+'</div>'+cmp(fat,pf,true)+'</div>'
     +'<div class="kpi"><div class="l">Despesas no mês</div><div class="v neg">'+brl(dsp)+'</div>'+cmp(dsp,pd,false)+'</div>'
     +'<div class="kpi"><div class="l">Lucro no mês</div><div class="v '+(luc<0?'neg':'')+'">'+brl(luc)+'</div><div class="small muted">margem '+(fat?Math.round(luc/fat*100)+'%':'—')+'</div>'+cmp(luc,pf-pd,true)+'</div>'
@@ -350,7 +357,7 @@ function chart(){
 R.lancamentos=function(){
   var h=head('Lançamentos','Cada dinheiro que entra ou sai')+help('O que são os lançamentos?','É o seu caderno financeiro: cada vez que você recebe (receita) ou paga (despesa) algo, anote aqui. Todo o resto do app (Painel, clientes, obrigações) é calculado a partir destas anotações.',['Toque em “+ Novo lançamento” (ou use a Venda rápida).','Escolha Receita ou Despesa e digite o valor.','Se ainda não recebeu/pagou, marque Pendente e informe o vencimento.','Para conta fixa ou venda parcelada, use o campo “Repetir”.']);
   h+='<div class="row" style="margin-bottom:12px"><button class="btn grow" data-a="new-l">+ Novo lançamento</button>'+(S.lanc.length?'<button class="btn sec" data-a="repeat-last">Repetir último</button>':'')+'</div>'+quickChips();
-  h+='<div class="card"><div class="stack">'+monthSel('lmes',UI.lm,true)+'<div class="muted small" style="margin-bottom:-4px">Tipo</div>'
+  h+='<div class="card"><div class="stack"><div class="row"><div class="grow">'+monthSel('lmes',UI.lm,true)+'</div><div style="width:104px">'+yearSel()+'</div></div>'+'<div class="muted small" style="margin-bottom:-4px">Tipo</div>'
     +'<div class="seg" role="radiogroup" aria-label="Filtrar tipo" style="margin:0">'+['todos|Todos','receita|Receitas','despesa|Despesas'].map(function(o){var p=o.split('|');return '<label><input type="radio" name="ftipo" value="'+p[0]+'" data-on="ftipo"'+(UI.tipo===p[0]?' checked':'')+'><span>'+p[1]+'</span></label>'}).join('')+'</div>'
     +'<div class="muted small" style="margin-bottom:-4px">Situação</div><div class="seg" role="radiogroup" aria-label="Filtrar status" style="margin:0">'+['todos|Todos','pendente|Pendentes','pago|Pagos'].map(function(o){var p=o.split('|');return '<label><input type="radio" name="fst" value="'+p[0]+'" data-on="fst"'+(UI.st===p[0]?' checked':'')+'><span>'+p[1]+'</span></label>'}).join('')+'</div></div></div>';
   h+='<div id="lanc-list">'+lancList()+'</div>';
@@ -522,7 +529,7 @@ R.obrigacoes=function(){
 
 /* ---------- Ajuda ---------- */
 var GLOSS=[['Receita (faturamento)','Todo dinheiro que os clientes pagam, ou vão pagar, pelos seus serviços.'],['Despesa','Tudo que você gasta para trabalhar: materiais, internet, transporte, impostos.'],['Lucro','O que sobra: receita menos despesas.'],['Margem','A parte de cada preço que vira lucro, em porcentagem.'],['A receber / A pagar','Dinheiro já combinado que ainda não entrou (a receber) ou ainda não saiu (a pagar).'],['DAS','A guia mensal de impostos do MEI. Precisa ser paga todo mês, mesmo sem vendas.'],['Relatório mensal de receitas','Um resumo do que você faturou no mês, para guardar junto das suas notas.'],['DASN-SIMEI','A declaração anual em que o MEI informa à Receita quanto faturou no ano.'],['Limite do MEI','O máximo que o MEI pode faturar em um ano. O Painel avisa quando você se aproxima dele.'],['Valor da hora','Quanto cada hora do seu trabalho precisa render para pagar as contas e sobrar o que você quer.'],['Ticket médio','Valor médio que cada serviço rende: total faturado dividido pelo número de serviços.'],['Ponto de equilíbrio','O mínimo que você precisa faturar por mês para cobrir os custos fixos e o DAS.'],['Reserva','Dinheiro separado do lucro para o 13º, férias e imprevistos, já que o MEI não tem esses benefícios.'],['Parcelado e recorrente','Parcelado divide um valor em várias vezes. Recorrente repete o mesmo valor todo mês (internet, aluguel, assinatura).']];
-var FAQ=[['O app tem bloqueio com senha?','Sim: em Configurações você pode ativar um PIN de 4 números. Ele protege contra curiosos, mas não substitui o backup.'],['Preciso de internet?','Para abrir o app pela primeira vez, sim. Depois de aberto, ele guarda tudo no seu aparelho. Para ter certeza, faça um backup de vez em quando (Configurações).'],['Onde ficam meus dados?','Somente no navegador do seu aparelho. Ninguém mais tem acesso, nem o vendedor do app.'],['E se eu trocar de celular?','Os dados não passam sozinhos. Faça o backup em Configurações, copie o texto e cole no app do aparelho novo.'],['E se eu limpar os dados do navegador?','Os dados são apagados. Por isso o backup é importante.'],['O limite do MEI e o DAS estão certos?','São valores de referência, editáveis em Configurações. Confira no Portal do Empreendedor e ajuste se mudarem.'],['Isso substitui um contador?','Não. É um organizador financeiro. Para dúvidas fiscais, fale com um contador.']];
+var FAQ=[['O app tem bloqueio com senha?','Sim: em Configurações você pode ativar um PIN de 4 números. Ele protege contra curiosos, mas não substitui o backup.'],['Preciso de internet?','Para abrir o app pela primeira vez, sim. Depois de aberto, ele guarda tudo no seu aparelho. Para ter certeza, faça um backup de vez em quando (Configurações).'],['Onde ficam meus dados?','Somente no navegador do seu aparelho. Ninguém mais tem acesso, nem o vendedor do app.'],['E se eu trocar de celular?','Os dados não passam sozinhos. Faça o backup em Configurações, copie o texto e cole no app do aparelho novo.'],['E se eu limpar os dados do navegador?','Os dados são apagados. Por isso o backup é importante.'],['O limite do MEI e o DAS estão certos?','São valores de referência, editáveis em Configurações. Confira no Portal do Empreendedor e ajuste se mudarem.'],['Isso substitui um contador?','Não. É um organizador financeiro. Para dúvidas fiscais, fale com um contador.'],['Uso iPhone: meus dados podem sumir?','No Safari comum, o iPhone pode apagar dados de sites que ficam muito tempo sem uso. Instalando o app na Tela de Início esse risco diminui. Em qualquer caso, faça backup de vez em quando.'],['Termos de uso','A licença é pessoal e intransferível, para uso do titular indicado no código. É proibido compartilhar o código ou o acesso, revender ou redistribuir o aplicativo. Seus dados ficam apenas no seu aparelho.']];
 R.ajuda=function(){
   var h=head('Ajuda','Explicações rápidas');
   h+='<div class="card"><h3>Comece em 3 passos</h3><ol style="margin:8px 0 0;padding-left:20px"><li>Em <b>Configurações</b>, preencha o nome do negócio, o DAS e a meta.</li><li>Em <b>Serviços</b> e <b>Clientes</b>, cadastre o que você vende e quem compra.</li><li>Em <b>Lançamentos</b>, anote cada dinheiro que entra ou sai. O <b>Painel</b> faz o resto.</li></ol></div>';
@@ -540,8 +547,10 @@ R.config=function(){
    +'<label class="f" style="margin:0">Tema<select class="in" data-on="theme"><option value="auto"'+(th==='auto'?' selected':'')+'>Automático (do aparelho)</option><option value="light"'+(th==='light'?' selected':'')+'>Claro</option><option value="dark"'+(th==='dark'?' selected':'')+'>Escuro</option></select></label></div>';
   h+='<div class="card"><h3>Divisão do lucro</h3><p class="muted small">Usada no card “Quanto posso retirar?” do Painel. O que sobrar é a sua retirada.</p>'+cf('r13','Reserva 13º e férias (% do lucro)',toIn(c.r13),'')+cf('rEm','Reserva de imprevistos (% do lucro)',toIn(c.rEm),'')+cf('rRe','Reinvestir no negócio (% do lucro)',toIn(c.rRe),'')+'</div>';
   h+='<div class="card"><h3>Backup dos seus dados</h3><p class="muted small">Seus dados ficam só neste aparelho. Copie o texto e guarde (em um e-mail para você ou num bloco de notas). Para restaurar, cole no campo abaixo.</p><p class="small"><b>'+(S.lastBackup?'Último backup: '+fdate(iso(new Date(S.lastBackup))):'Você ainda não fez backup.')+'</b></p>'
-   +'<div class="stack"><button class="btn full" data-a="bk-copy">Copiar backup</button><label class="f" style="margin:0">Restaurar backup (cole aqui)<textarea class="in" id="bk-in" placeholder="Cole o texto do backup"></textarea></label><button class="btn sec full" data-a="bk-restore">Restaurar</button></div>'+(memOnly?'<p class="neg small">Atenção: este navegador não permitiu salvar dados no aparelho; o que você anotar pode se perder ao fechar.</p>':'')+'</div>';
+   +'<div class="stack"><button class="btn full" data-a="bk-file">Baixar arquivo de backup</button><label class="f" style="margin:0">Restaurar de um arquivo<input class="in" type="file" accept=".json,application/json" data-on="bkfile"></label><button class="btn sec full" data-a="bk-copy">Copiar backup como texto</button><label class="f" style="margin:0">Restaurar backup (cole aqui)<textarea class="in" id="bk-in" placeholder="Cole o texto do backup"></textarea></label><button class="btn sec full" data-a="bk-restore">Restaurar</button></div>'+(memOnly?'<p class="neg small">Atenção: este navegador não permitiu salvar dados no aparelho; o que você anotar pode se perder ao fechar.</p>':'')+'</div>';
+  h+='<div class="card"><h3>Instalar no celular</h3><p class="muted small">Instalado, o app abre em tela cheia, com ícone próprio, e funciona sem internet. <b>Android (Chrome):</b> menu ⋮ → Instalar app. <b>iPhone (Safari):</b> Compartilhar → Adicionar à Tela de Início.</p>'+(deferredInstall?'<button class="btn full" data-a="install">Instalar app agora</button>':'')+'</div>';
   h+='<div class="card"><h3>Exportar para o contador</h3><p class="muted small">Gera uma planilha (CSV) com todos os lançamentos, que abre no Excel ou no Google Planilhas.</p><div class="stack"><button class="btn full" data-a="csv">Baixar planilha (CSV)</button><button class="btn sec full" data-a="csv-copy">Copiar como texto</button></div></div>';
+  if(LIC)h+='<div class="card"><h3>Sua licença</h3><p style="margin:0"><b>Licenciado para '+esc(LIC.n)+'</b></p><p class="muted small" style="margin:4px 0 0">Código nº '+esc(LIC.id)+' · emitido em '+fdate(LIC.t)+'. A licença é pessoal e intransferível.</p></div>';
   h+='<div class="card"><h3>Bloqueio por PIN</h3><p class="muted small">Pede um PIN de 4 números ao abrir o app. Protege contra curiosos, mas não é criptografia. Se esquecer o PIN, só dá para entrar apagando os dados deste aparelho (por isso faça backup).</p>'+(S.pin?'<button class="btn danger full" data-a="pin-rm">Remover PIN</button>':'<label class="f">Novo PIN (4 números)<input class="in" id="pin-new" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></label><button class="btn full" data-a="pin-set">Ativar PIN</button>')+'</div>';
   h+='<div class="card"><h3>Começar de novo</h3><div class="stack"><button class="btn sec full" data-a="load-demo">Carregar dados de exemplo</button><button class="btn danger full" data-a="wipe">'+(UI.armed==='wipe'?'Toque de novo: apagar TUDO e começar do zero':'Apagar tudo e começar do zero')+'</button></div></div>';
   return h;
@@ -558,13 +567,17 @@ function nav(r){
   var more=['orcamento','precificacao','obrigacoes','ajuda','config'].indexOf(r)>-1;
   $('nav').innerHTML=h+'<button data-a="more"'+(more?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+ICONS.mais+'</svg>Mais</button>';
 }
+var isIOS=function(){return /iphone|ipad|ipod/i.test(navigator.userAgent)};
+var isStandalone=function(){return window.navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)};
 function banner(){
   if(S.demo)return '<div class="banner"><span><b>Dados de exemplo.</b> Explore à vontade.</span><button class="mini" data-a="wipe-now">Começar do zero</button></div>';
+  if(isIOS()&&!isStandalone()&&!S.iosTip&&/^https?:$/.test(location.protocol))return '<div class="banner"><span><b>iPhone:</b> instale na Tela de Início para não perder seus dados.</span><button class="mini" data-a="ios-help">Como fazer</button><button class="mini" data-a="ios-ok">Ok</button></div>';
   var has=S.lanc.length||S.clientes.length,old=!S.lastBackup||(Date.now()-S.lastBackup>14*864e5);
   if(has&&old)return '<div class="banner"><span><b>Faça um backup.</b> '+(S.lastBackup?'Já faz mais de 14 dias.':'Você ainda não fez nenhum.')+'</span><a class="mini" style="display:inline-flex;align-items:center;text-decoration:none" href="#config">Fazer agora</a></div>';
   return '';
 }
-function render(){var r=route();$('view').innerHTML=banner()+R[r]();nav(r);document.title=ROUTES[r]+' — Sistema MEI'}
+function licFoot(){return LIC?'<p class="lic-foot">Licenciado para '+esc(LIC.n)+' · nº '+esc(LIC.id)+'</p>':''}
+function render(){var r=route();$('view').innerHTML=banner()+R[r]()+licFoot();nav(r);document.title=ROUTES[r]+' — Sistema MEI'}
 function rerender(){var y=window.scrollY;render();window.scrollTo(0,y)}
 function refreshList(){var e=$('lanc-list');if(e)e.innerHTML=lancList();var c=$('cli-list');if(c)c.innerHTML=cliList()}
 function upsert(arr,o){var i=arr.findIndex(function(x){return x.id===o.id});if(i>-1)arr[i]=o;else arr.push(o)}
@@ -588,38 +601,45 @@ function openWelcome(){openSheet('<h2>Bem-vindo(a)!</h2><p class="muted">Este ap
 function hp(str){var h1=0xdeadbeef,h2=0x41c6ce57,i,ch;for(i=0;i<str.length;i++){ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677)}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return String(4294967296*(2097151&h2)+(h1>>>0))}
 function showLock(){var o=$('lock');o.hidden=false;o.innerHTML='<div class="sheet" style="border-radius:18px;max-width:360px;margin:auto"><h2>Digite seu PIN</h2><form data-form="unlock"><label class="f">PIN de 4 números<input class="in" name="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" required></label><button class="btn full" type="submit">Entrar</button></form><div class="stack" style="margin-top:10px"><button class="btn danger full" data-a="forgot">'+(UI.armed==='forgot'?'Toque de novo: apagar dados e entrar':'Esqueci o PIN')+'</button></div></div>';var i=o.querySelector('input');if(i)i.focus()}
 function csvText(){var rows=[['Data','Tipo','Cliente','Serviço','Categoria','Descrição','Valor','Forma de pagamento','Situação','Vencimento','Nota fiscal']];S.lanc.slice().sort(function(a,b){return a.data.localeCompare(b.data)}).forEach(function(l){var c=cli(l.clienteId),sv=svc(l.servicoId);rows.push([fdate(l.data),l.tipo==='receita'?'Receita':'Despesa',c?c.nome:'',sv?sv.nome:'',l.cat||'',l.desc||'',(Number(l.valor)||0).toFixed(2).replace('.',','),l.forma||'',l.status==='pago'?'Pago':'Pendente',fdate(l.venc),l.nf||''])});return rows.map(function(r){return r.map(function(x){return '"'+String(x).replace(/"/g,'""')+'"'}).join(';')}).join('\r\n')}
-function download(name,text){try{var b=new Blob(['\ufeff'+text],{type:'text/csv;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove()},600);return true}catch(e){return false}}
+function download(name,text,mime){try{var b=new Blob([mime?text:'\ufeff'+text],{type:mime||'text/csv;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove()},600);return true}catch(e){return false}}
 
 var A={
   close:function(){closeSheet()},
   more:function(){openSheet('<h2>Mais</h2><div class="stack">'+[['orcamento','Orçamentos e recibos','Documentos prontos para enviar'],['precificacao','Precificação','Quanto cobrar'],['obrigacoes','Obrigações do MEI','DAS, relatório e declaração'],['ajuda','Ajuda e glossário','Explicações rápidas'],['config','Configurações','Dados, backup e tema']].map(function(i){return '<a class="li" href="#'+i[0]+'" style="text-decoration:none;color:inherit"><span class="li-main"><span class="t"><b>'+i[1]+'</b><span class="muted small">'+i[2]+'</span></span></span></a>'}).join('')+'</div>')},
   'new-l':function(){openSheet(lancForm(newL()))},
   'edit-l':function(e,id){var l=S.lanc.find(function(x){return x.id===id});if(l)openSheet(lancForm(l))},
-  'del-l':function(e,id){if(UI.armed==='l'+id){S.lanc=S.lanc.filter(function(x){return x.id!==id});save();closeSheet();rerender();toast('Lançamento excluído.')}else{UI.armed='l'+id;e.textContent='Toque de novo para excluir'}},
+  'del-l':function(e,id){if(UI.armed==='l'+id){var old=S.lanc.find(function(x){return x.id===id});S.lanc=S.lanc.filter(function(x){return x.id!==id});save();closeSheet();rerender();toast('Lançamento excluído.',{label:'Desfazer',fn:function(){S.lanc.push(old);save()}})}else{UI.armed='l'+id;e.textContent='Toque de novo para excluir'}},
   pay:function(e,id){var l=S.lanc.find(function(x){return x.id===id});if(l){l.status='pago';l.venc='';save();rerender();toast(l.tipo==='receita'?'Marcado como recebido.':'Marcado como pago.')}},
   'filtro-pend':function(){UI.st='pendente';UI.tipo='todos';UI.lm=0},
   'new-c':function(){openSheet(cliForm({id:'',nome:'',tel:'',email:'',cidade:'',origem:'',obs:''}))},
   'edit-c':function(e,id){var c=cli(id);if(c)openSheet(cliForm(c))},
-  'del-c':function(e,id){if(UI.armed==='c'+id){S.clientes=S.clientes.filter(function(x){return x.id!==id});save();closeSheet();rerender();toast('Cliente excluído.')}else{UI.armed='c'+id;e.textContent='Toque de novo para excluir'}},
+  'del-c':function(e,id){if(UI.armed==='c'+id){var old=cli(id);S.clientes=S.clientes.filter(function(x){return x.id!==id});save();closeSheet();rerender();toast('Cliente excluído.',{label:'Desfazer',fn:function(){S.clientes.push(old);save()}})}else{UI.armed='c'+id;e.textContent='Toque de novo para excluir'}},
   'new-s':function(){openSheet(svcForm({id:'',nome:'',cat:'',preco:'',horas:'',custo:''}))},
   'edit-s':function(e,id){var s=svc(id);if(s){openSheet(svcForm(s));var f=document.querySelector('form[data-form=svc]');if(f)$('svc-prev').innerHTML=svcPrev(f)}},
-  'del-s':function(e,id){if(UI.armed==='s'+id){S.servicos=S.servicos.filter(function(x){return x.id!==id});save();closeSheet();rerender();toast('Serviço excluído.')}else{UI.armed='s'+id;e.textContent='Toque de novo para excluir'}},
+  'del-s':function(e,id){if(UI.armed==='s'+id){var old=svc(id);S.servicos=S.servicos.filter(function(x){return x.id!==id});save();closeSheet();rerender();toast('Serviço excluído.',{label:'Desfazer',fn:function(){S.servicos.push(old);save()}})}else{UI.armed='s'+id;e.textContent='Toque de novo para excluir'}},
   'orc-add':function(){UI.orc.itens.push({sid:'',qtd:'1'});rerender()},
   'orc-rm':function(e,id){UI.orc.itens.splice(Number(id),1);rerender()},
   'orc-copy':function(){copyText(orcText(),'Texto do orçamento copiado. Cole onde quiser.')},
   'orc-make':function(){var T=orcTotals();if(T.tot<=0){toast('Adicione ao menos um serviço.');return}var first=UI.orc.itens.filter(function(i){return svc(i.sid)})[0];S.lanc.push({id:uid(),data:todayISO(),tipo:'receita',clienteId:UI.orc.cliente,servicoId:first?first.sid:'',cat:'',desc:'Orçamento'+(UI.orc.num?' nº '+UI.orc.num:''),valor:Math.round(T.tot*100)/100,forma:'Pix',status:'pendente',venc:iso(addDays(new Date(),7)),nf:'Não'});save();toast('Criado em Lançamentos como “a receber”. Ajuste o vencimento lá.')},
   print:function(){try{window.print()}catch(e){toast('Use o menu do navegador para imprimir ou salvar em PDF.')}},
   'usar-preco':function(e,id){var s=svc(id);if(!s)return;var sg=Math.ceil(sugerido(s,custoHora()));s.preco=sg;save();$('pre-out').innerHTML=preOut();toast('Preço de “'+s.nome+'” atualizado para '+brl(sg)+'.')},
-  'tg-das':function(e,id){S.obrig.das[id]=!S.obrig.das[id];save();rerender()},
+  'tg-das':function(e,id){var on=!S.obrig.das[id];S.obrig.das[id]=on;var m=Number(id.split('-')[1]),desc='DAS competência '+MES[m-1],lid='das-'+id;
+    if(on){if(!S.lanc.some(function(l){return l.id===lid||(l.cat==='Impostos (DAS)'&&l.desc===desc)}))S.lanc.push({id:lid,data:todayISO(),tipo:'despesa',clienteId:'',servicoId:'',cat:'Impostos (DAS)',desc:desc,valor:num(S.config.das),forma:'Boleto',status:'pago',venc:'',nf:''});toast('DAS pago e lançado nas despesas.')}
+    else{S.lanc=S.lanc.filter(function(l){return l.id!==lid});toast('DAS desmarcado.')}
+    save();rerender()},
   'tg-rel':function(e,id){S.obrig.rel[id]=!S.obrig.rel[id];save();rerender()},
   'tg-dasn':function(){S.obrig.dasn=!S.obrig.dasn;save();rerender()},
   'tg-chk':function(e,id){S.obrig.check[id]=!S.obrig.check[id];save();rerender()},
   'bk-copy':function(){S.lastBackup=Date.now();save();copyText(JSON.stringify(S),'Backup copiado! Guarde em um lugar seguro.')},
-  'bk-restore':function(){var t=($('bk-in').value||'').trim();try{var o=JSON.parse(t);if(!o||o.v!==1||!Array.isArray(o.lanc))throw 0;S=migrate(o);save();toast('Backup restaurado.');rerender()}catch(x){toast('Texto de backup inválido.')}},
+  'bk-restore':function(){restoreText($('bk-in').value)},
+  'bk-file':function(){S.lastBackup=Date.now();save();var ok=download('backup-sistema-mei-'+todayISO()+'.json',JSON.stringify(S),'application/json');toast(ok?'Arquivo de backup gerado. Guarde em lugar seguro.':'Não foi possível baixar. Use “Copiar backup”.')},
+  install:function(){if(deferredInstall){deferredInstall.prompt();deferredInstall=null;rerender()}},
+  'ios-help':function(){openSheet('<h2>Instalar no iPhone</h2><p class="muted">Para o app abrir em tela cheia e seus dados ficarem mais protegidos:</p><ol><li>Abra este endereço no <b>Safari</b>.</li><li>Toque no botão <b>Compartilhar</b> (quadrado com seta).</li><li>Escolha <b>Adicionar à Tela de Início</b>.</li><li>Abra o app pelo ícone novo.</li></ol><button class="btn full" data-a="close">Entendi</button>')},
+  'ios-ok':function(){S.iosTip=true;save();rerender()},
   'load-demo':function(){S=demo();save();toast('Dados de exemplo carregados.');go('painel')},
   wipe:function(e){if(UI.armed==='wipe'){S=blank();S.welcomed=true;save();UI.armed=null;resetOrc();if(route()!=='painel')location.hash='#painel';else render();setTimeout(openNiche,150)}else{UI.armed='wipe';e.textContent='Toque de novo: apagar TUDO e começar do zero'}},
   'wipe-now':function(){S=blank();S.welcomed=true;save();resetOrc();render();openNiche()},
-  quick:function(e,id){var sv=svc(id);if(!sv)return;var l=newL();l.servicoId=id;l.valor=sv.preco;openSheet(lancForm(l))},
+  quick:function(e,id){var sv=svc(id);if(!sv)return;var l=newL();l.servicoId=id;l.valor=sv.preco;openSheet(lancForm(l));var fm=document.querySelector('form[data-form=lanc]');if(fm)fm.dataset.lastp=sv.preco},
   'repeat-last':function(){var a=S.lanc.slice().sort(function(x,y){return y.data.localeCompare(x.data)})[0];if(!a)return;openSheet(lancForm(Object.assign({},a,{id:'',data:todayISO(),status:'pago',venc:''})))},
   cobrar:function(e,id){var l=S.lanc.find(function(x){return x.id===id});if(!l)return;var c=cli(l.clienteId),sv=svc(l.servicoId),alvo=l.desc||(sv?sv.nome:'');copyText((c?'Olá, '+c.nome+'!':'Olá!')+' Tudo bem? Passando para lembrar do pagamento'+(alvo?' de '+alvo:'')+' no valor de '+brl(l.valor)+', com vencimento em '+fdate(l.venc)+'.'+(S.config.pix?' Chave Pix: '+S.config.pix+'.':'')+' Qualquer dúvida, estou à disposição. Obrigado(a)!','Mensagem de cobrança copiada. Cole onde quiser.')},
   reativar:function(e,id){var c=cli(id);if(!c)return;var last=recs().filter(function(l){return l.clienteId===id&&l.servicoId}).sort(function(a,b){return b.data.localeCompare(a.data)})[0],sv=last?svc(last.servicoId):null;copyText('Olá, '+c.nome+'! Tudo bem? Faz um tempo que não nos falamos. Estou com horários disponíveis'+(sv?' para '+sv.nome.toLowerCase():'')+'. Se quiser, é só me avisar!','Mensagem de retorno copiada. Cole onde quiser.')},
@@ -628,7 +648,8 @@ var A={
   'start-new':function(){S.welcomed=true;save();openNiche()},
   'start-demo':function(){S=demo();save();closeSheet();if(route()==='painel')render();else go('painel')},
   'orc-save':function(){var T=orcTotals();if(T.tot<=0){toast('Adicione ao menos um serviço.');return}var o=UI.orc;S.orcs.push({id:uid(),data:todayISO(),num:o.num,cliente:o.cliente,itens:o.itens.filter(function(i){return svc(i.sid)}).map(function(i){return {sid:i.sid,qtd:num(i.qtd)||1}}),tot:Math.round(T.tot*100)/100,status:'enviado',lancId:''});save();toast('Salvo no histórico. Mude o status quando o cliente responder.')},
-  'orc-del':function(e,id){if(UI.armed==='o'+id){S.orcs=S.orcs.filter(function(x){return x.id!==id});save();UI.armed=null;rerender();toast('Orçamento excluído.')}else{UI.armed='o'+id;e.textContent='Toque de novo'}},
+  'orc-del':function(e,id){if(UI.armed==='o'+id){var old=S.orcs.find(function(x){return x.id===id});S.orcs=S.orcs.filter(function(x){return x.id!==id});save();UI.armed=null;rerender();toast('Orçamento excluído.',{label:'Desfazer',fn:function(){S.orcs.push(old);save()}})}else{UI.armed='o'+id;e.textContent='Toque de novo'}},
+  undo:function(){if(UI.undo){var f=UI.undo;UI.undo=null;f();$('toast').hidden=true;rerender()}},
   csv:function(){var ok=download('lancamentos-mei.csv',csvText());toast(ok?'Gerando a planilha… se não baixar, use “Copiar como texto”.':'Não foi possível baixar. Use “Copiar como texto”.')},
   'csv-copy':function(){copyText(csvText(),'Planilha copiada. Cole em uma planilha.')},
   'pin-set':function(){var v=($('pin-new').value||'').trim();if(!/^\d{4}$/.test(v)){toast('Digite exatamente 4 números.');return}S.pin=hp(v+'mei');save();rerender();toast('PIN ativado. Ele será pedido ao abrir o app.')},
@@ -636,6 +657,7 @@ var A={
   forgot:function(e){if(UI.armed==='forgot'){S=blank();S.welcomed=true;save();UI.armed=null;$('lock').hidden=true;$('lock').innerHTML='';render();toast('Dados apagados. Comece do zero.');openNiche()}else{UI.armed='forgot';e.textContent='Toque de novo: apagar dados e entrar'}},
   selcp:function(){var t=$('cp');t.focus();t.select()}
 };
+function restoreText(t){try{var o=JSON.parse(String(t).trim());if(!o||o.v!==1||!Array.isArray(o.lanc))throw 0;if(o.licId&&LIC&&o.licId!==LIC.id){toast('Este backup pertence a outro licenciado.');return}S=migrate(o);if(LIC)S.licId=LIC.id;save();toast('Backup restaurado.');rerender()}catch(x){toast('Arquivo ou texto de backup inválido.')}}
 function copyText(t,msg){
   var done=function(){toast(msg)},fb=function(){openSheet('<h2>Copie o texto</h2><p class="muted small">Seu navegador não permitiu copiar sozinho. Toque no texto, selecione tudo e copie.</p><textarea class="in" id="cp" rows="10" readonly>'+esc(t)+'</textarea><div class="stack" style="margin-top:12px"><button class="btn full" data-a="selcp">Selecionar tudo</button><button class="btn sec full" data-a="close">Fechar</button></div>')};
   try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,fb)}else fb()}catch(e){fb()}
@@ -667,7 +689,7 @@ var ON={
   ltipo:function(t){t.closest('form').dataset.tipo=t.value},
   lst:function(t){t.closest('form').dataset.st=t.value},
   lcli:function(t){t.closest('form').dataset.newcli=t.value==='__new__'?'1':''},
-  lsvc:function(t){var s=svc(t.value),f=t.closest('form');if(s){if(!num(f.valor.value)||f.dataset.autofill==='1'){f.valor.value=toIn(s.preco);f.dataset.autofill='1'}}},
+  lsvc:function(t){var sv=svc(t.value),f=t.closest('form');if(!sv)return;var cur=num(f.valor.value),lp=f.dataset.lastp===undefined?null:Number(f.dataset.lastp);if(!cur||(lp!==null&&cur===lp)){f.valor.value=toIn(sv.preco);f.dataset.lastp=sv.preco}},
   svcprev:function(t){$('svc-prev').innerHTML=svcPrev(t.closest('form'))},
   omode:function(t){UI.orcMode=t.value;rerender()},
   orc:function(t){UI.orc[t.dataset.k]=t.value;var p=$('doc-prev');if(p)p.innerHTML=orcPreview()},
@@ -681,6 +703,8 @@ var ON={
   cpar:function(t){UI.parados=t.value==='1';refreshList()},
   lrep:function(t){t.closest('form').dataset.rep=t.value},
   orcst:function(t){var o=S.orcs.find(function(x){return x.id===t.dataset.id});if(!o)return;o.status=t.value;if(o.status==='aprovado'&&!o.lancId){var l={id:uid(),data:todayISO(),tipo:'receita',clienteId:o.cliente,servicoId:(o.itens[0]||{}).sid||'',cat:'',desc:'Orçamento'+(o.num?' nº '+o.num:''),valor:o.tot,forma:'Pix',status:'pendente',venc:iso(addDays(new Date(),7)),nf:'Não'};S.lanc.push(l);o.lancId=l.id;toast('Aprovado! Criei o lançamento “a receber”.')}save();rerender()},
+  ano:function(t){S.config.ano=Number(t.value);save();rerender()},
+  bkfile:function(t){var f=t.files&&t.files[0];if(!f)return;var r=new FileReader();r.onload=function(){restoreText(String(r.result))};r.readAsText(f)},
   theme:function(t){try{localStorage.setItem(THEME_KEY,t.value)}catch(e){}applyTheme()}
 };
 
@@ -695,17 +719,73 @@ function onInput(e){var t=e.target;if(!t||!t.dataset||!t.dataset.on)return;var f
 document.addEventListener('input',onInput);
 document.addEventListener('change',function(e){var t=e.target;if(t&&t.dataset&&t.dataset.on&&(t.tagName==='SELECT'||t.type==='radio')){/* já tratado em input */}});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('ov').hidden)closeSheet()});
-window.addEventListener('hashchange',function(){UI.armed=null;closeSheet();render();window.scrollTo(0,0)});
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredInstall=e;if(S&&route()==='config')rerender()});
+window.addEventListener('hashchange',function(){if(!S)return;UI.armed=null;closeSheet();render();window.scrollTo(0,0)});
 
-/* ============================== início ============================== */
-S=load();
-var first=false;
-if(!S){S=blank();first=true}
-applyTheme();
-render();
-if(S.pin)showLock();
-else if(first||(!S.welcomed&&!S.lanc.length&&!S.servicos.length&&!S.clientes.length))openWelcome();
-if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
+/* ============================== licença e início ============================== */
+function b64u2buf(x){x=x.replace(/-/g,'+').replace(/_/g,'/');while(x.length%4)x+='=';var b=atob(x),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+function checkLicense(code){
+  var cfg=window.MEI_LICENSE;
+  if(!window.crypto||!crypto.subtle)return Promise.resolve({ok:false,why:'semsuporte'});
+  var parts=String(code||'').replace(/\s+/g,'').split('.');
+  if(parts.length!==3||parts[0]!=='MEI1')return Promise.resolve({ok:false,why:'formato'});
+  return crypto.subtle.importKey('jwk',cfg.pub,{name:'ECDSA',namedCurve:'P-256'},false,['verify']).then(function(key){
+    return crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,b64u2buf(parts[2]),b64u2buf(parts[1])).then(function(ok){
+      if(!ok)return {ok:false,why:'assinatura'};
+      var pl=JSON.parse(new TextDecoder().decode(b64u2buf(parts[1])));
+      if((cfg.revoked||[]).indexOf(pl.id)>-1)return {ok:false,why:'revogada',pl:pl};
+      return {ok:true,pl:pl};
+    });
+  }).catch(function(){return {ok:false,why:'erro'}});
+}
+function showGate(msg){
+  var cfg=window.MEI_LICENSE||{},g=$('gate');g.hidden=false;
+  g.innerHTML='<div class="sheet" style="border-radius:18px;max-width:440px;margin:auto"><h2>Ativar seu acesso</h2><p class="muted">Cole abaixo o código que você recebeu após a compra. Ele é pessoal e traz o seu nome.</p><form data-form="gate"><label class="f">Código de acesso<textarea class="in" name="code" rows="4" placeholder="MEI1.…" required autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label><div class="stack"><button class="btn full" type="submit">Ativar</button><button class="btn sec full" type="button" data-a="gate-paste">Colar da área de transferência</button></div></form><p class="small" id="gate-msg" role="status" style="min-height:20px;margin:10px 0 0">'+esc(msg||'')+'</p><p class="small muted" style="margin:0">'+(cfg.buy?'Ainda não comprou? '+esc(cfg.buy)+'<br>':'')+(cfg.support?'Dúvidas: '+esc(cfg.support):'')+'</p></div>';
+}
+function showRevoked(pl){
+  S=load()||blank();var cfg=window.MEI_LICENSE||{},g=$('gate');g.hidden=false;
+  g.innerHTML='<div class="sheet" style="border-radius:18px;max-width:440px;margin:auto"><h2>Acesso desativado</h2><p class="muted">A licença de <b>'+esc(pl.n)+'</b> foi desativada. Seus dados continuam guardados neste aparelho: copie um backup antes de sair.</p><label class="f">Backup<textarea class="in" id="rev-bk" rows="5" readonly>'+esc(JSON.stringify(S))+'</textarea></label><div class="stack"><button class="btn full" data-a="rev-backup">Copiar meu backup</button><button class="btn sec full" data-a="rev-other">Usar outro código</button></div><p class="small muted">'+(cfg.support?'Dúvidas: '+esc(cfg.support):'')+'</p></div>';
+}
+FORMS.gate=function(f){
+  var code=String(new FormData(f).get('code')||'').replace(/\s+/g,''),msg=$('gate-msg');msg.textContent='Verificando…';
+  checkLicense(code).then(function(r){
+    if(r.ok){try{localStorage.setItem('meiapp:lic',code)}catch(e){}LIC=r.pl;$('gate').hidden=true;$('gate').innerHTML='';start()}
+    else if(r.why==='revogada')msg.textContent='Esta licença foi desativada. Fale com o suporte.';
+    else if(r.why==='semsuporte')msg.textContent='Este navegador não consegue verificar o código. Abra o link no Chrome ou no Safari atualizado.';
+    else msg.textContent='Código inválido. Confira se copiou o código inteiro, sem cortar nada.';
+  });
+};
+A['gate-paste']=function(){try{navigator.clipboard.readText().then(function(t){var a=document.querySelector('#gate textarea');if(a)a.value=t}).catch(function(){toast('Não foi possível colar sozinho. Cole manualmente no campo.')})}catch(e){toast('Cole manualmente no campo.')}};
+A['rev-backup']=function(){var t=$('rev-bk');t.focus();t.select();try{document.execCommand('copy');toast('Backup copiado.')}catch(e){toast('Selecione o texto e copie.')}};
+A['rev-other']=function(){try{localStorage.removeItem('meiapp:lic')}catch(e){}showGate()};
+function start(){
+  S=load();var first=false;
+  if(!S){S=blank();first=true}
+  if(LIC)S.licId=LIC.id;
+  applyTheme();render();
+  if(S.pin)showLock();
+  else if(first||(!S.welcomed&&!S.lanc.length&&!S.servicos.length&&!S.clientes.length))openWelcome();
+}
+function gateInit(){
+  applyTheme();
+  var cfg=window.MEI_LICENSE;
+  if(!cfg||!cfg.required){start();return}
+  var code='';try{code=localStorage.getItem('meiapp:lic')||''}catch(e){}
+  if(!code){showGate();return}
+  checkLicense(code).then(function(r){
+    if(r.ok){LIC=r.pl;start()}
+    else if(r.why==='revogada')showRevoked(r.pl);
+    else showGate(r.why==='semsuporte'?'Este navegador não consegue verificar o código.':'Seu código não é válido. Peça um novo ao vendedor.');
+  });
+}
+gateInit();
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      reg.addEventListener('updatefound',function(){var nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',function(){if(nw.state==='installed'&&navigator.serviceWorker.controller){var b=document.createElement('div');b.className='toast';b.style.bottom='calc(90px + env(safe-area-inset-bottom,0px))';b.innerHTML='Nova versão disponível. <button class="tbtn" id="upd">Atualizar</button>';document.body.appendChild(b);document.getElementById('upd').onclick=function(){location.reload()}}})});
+    }).catch(function(){});
+  });
+}
 })();
 </script>
 </body>
