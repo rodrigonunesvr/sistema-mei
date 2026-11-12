@@ -1,0 +1,7 @@
+SISTEMA MEI — arquivos do site
+- index.html            -> o aplicativo (todo o funcionamento)
+- manifest.webmanifest  -> permite instalar na tela inicial do celular
+- sw.js                 -> permite abrir sem internet
+- icon-192.png / icon-512.png -> ícone do aplicativo
+
+Para ATUALIZAR o app no futuro: troque o index.html e, no arquivo sw.js, aumente o número da versão (mei-v1 -> mei-v2).

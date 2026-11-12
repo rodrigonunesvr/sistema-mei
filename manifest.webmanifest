@@ -1,0 +1,17 @@
+{
+  "name": "Sistema MEI — Serviços",
+  "short_name": "Sistema MEI",
+  "description": "Controle financeiro para MEI prestador de serviços.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "pt-BR",
+  "background_color": "#F2F6F8",
+  "theme_color": "#1F3A5F",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
